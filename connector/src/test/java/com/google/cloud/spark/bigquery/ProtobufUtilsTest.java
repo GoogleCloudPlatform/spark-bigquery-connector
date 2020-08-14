@@ -16,7 +16,6 @@
 package com.google.cloud.spark.bigquery;
 
 import com.google.cloud.bigquery.Field;
-import com.google.cloud.bigquery.FieldList;
 import com.google.cloud.bigquery.LegacySQLTypeName;
 import com.google.cloud.bigquery.Schema;
 import com.google.cloud.bigquery.storage.v1alpha2.ProtoBufProto;
@@ -36,8 +35,12 @@ import org.apache.spark.unsafe.types.UTF8String;
 import org.junit.AssumptionViolatedException;
 import org.junit.Test;
 
+import java.math.BigDecimal;
+import java.util.Base64;
+
 import static com.google.cloud.spark.bigquery.ProtobufUtils.*;
 import static com.google.common.truth.Truth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.fail;
 
 public class ProtobufUtilsTest {
@@ -86,7 +89,7 @@ public class ProtobufUtilsTest {
                                 .addField(PROTO_DOUBLE_FIELD.clone().setName("Float").setNumber(5))
                                 .addField(PROTO_BOOLEAN_FIELD.clone().setNumber(6))
                                 .addField(PROTO_BYTES_FIELD.clone().setNumber(7))
-                                .addField(PROTO_INTEGER_FIELD.clone().setName("Date").setNumber(8))
+                                .addField(PROTO_DATE_FIELD.clone().setNumber(8))
                                 .addField(
                                     PROTO_INTEGER_FIELD.clone().setName("TimeStamp").setNumber(9))
                                 .setName("Schema")
@@ -156,7 +159,7 @@ public class ProtobufUtilsTest {
                   .add(new StructField("String", DataTypes.StringType, false, Metadata.empty())),
               new InternalRow[] {new GenericInternalRow(new Object[] {null})});
       fail("Convert did not assert field's /'Required/' status");
-    } catch (Exception e) {
+    } catch (Exception ignored) {
     }
     try {
       ProtoBufProto.ProtoRows converted =
@@ -165,7 +168,7 @@ public class ProtobufUtilsTest {
                   .add(new StructField("String", DataTypes.StringType, true, Metadata.empty())),
               new InternalRow[] {new GenericInternalRow(new Object[] {null})});
     } catch (Exception e) {
-      fail("A nullable field could not be set to null.");
+      fail("A nullable field could not be set to null");
     }
   }
 
@@ -209,47 +212,47 @@ public class ProtobufUtilsTest {
           .add(SPARK_TIMESTAMP_FIELD);
 
   public final Field BIGQUERY_INTEGER_FIELD =
-      Field.newBuilder("Number", LegacySQLTypeName.INTEGER, (FieldList) null)
+      Field.newBuilder("Number", LegacySQLTypeName.INTEGER)
           .setMode(Field.Mode.NULLABLE)
           .build();
   public final Field BIGQUERY_STRING_FIELD =
-      Field.newBuilder("String", LegacySQLTypeName.STRING, (FieldList) null)
+      Field.newBuilder("String", LegacySQLTypeName.STRING)
           .setMode(Field.Mode.REQUIRED)
           .build();
   public final Field BIGQUERY_NESTED_STRUCT_FIELD =
       Field.newBuilder(
               "Struct",
               LegacySQLTypeName.RECORD,
-              Field.newBuilder("Number", LegacySQLTypeName.INTEGER, (FieldList) null)
+              Field.newBuilder("Number", LegacySQLTypeName.INTEGER)
                   .setMode(Field.Mode.NULLABLE)
                   .build(),
-              Field.newBuilder("String", LegacySQLTypeName.STRING, (FieldList) null)
+              Field.newBuilder("String", LegacySQLTypeName.STRING)
                   .setMode(Field.Mode.NULLABLE)
                   .build())
           .setMode(Field.Mode.NULLABLE)
           .build();
   public final Field BIGQUERY_ARRAY_FIELD =
-      Field.newBuilder("Array", LegacySQLTypeName.INTEGER, (FieldList) null)
+      Field.newBuilder("Array", LegacySQLTypeName.INTEGER)
           .setMode(Field.Mode.REPEATED)
           .build();
   public final Field BIGQUERY_FLOAT_FIELD =
-      Field.newBuilder("Float", LegacySQLTypeName.FLOAT, (FieldList) null)
+      Field.newBuilder("Float", LegacySQLTypeName.FLOAT)
           .setMode(Field.Mode.NULLABLE)
           .build();
   public final Field BIGQUERY_BOOLEAN_FIELD =
-      Field.newBuilder("Boolean", LegacySQLTypeName.BOOLEAN, (FieldList) null)
+      Field.newBuilder("Boolean", LegacySQLTypeName.BOOLEAN)
           .setMode(Field.Mode.NULLABLE)
           .build();
   public final Field BIGQUERY_BYTES_FIELD =
-      Field.newBuilder("Binary", LegacySQLTypeName.BYTES, (FieldList) null)
+      Field.newBuilder("Binary", LegacySQLTypeName.BYTES)
           .setMode(Field.Mode.NULLABLE)
           .build();
   public final Field BIGQUERY_DATE_FIELD =
-      Field.newBuilder("Date", LegacySQLTypeName.DATE, (FieldList) null)
+      Field.newBuilder("Date", LegacySQLTypeName.DATE)
           .setMode(Field.Mode.NULLABLE)
           .build();
   public final Field BIGQUERY_TIMESTAMP_FIELD =
-      Field.newBuilder("TimeStamp", LegacySQLTypeName.TIMESTAMP, (FieldList) null)
+      Field.newBuilder("TimeStamp", LegacySQLTypeName.TIMESTAMP)
           .setMode(Field.Mode.NULLABLE)
           .build();
 
@@ -316,6 +319,12 @@ public class ProtobufUtilsTest {
           .setNumber(1)
           .setType(DescriptorProtos.FieldDescriptorProto.Type.TYPE_BYTES)
           .setLabel(DescriptorProtos.FieldDescriptorProto.Label.LABEL_OPTIONAL);
+  public final DescriptorProtos.FieldDescriptorProto.Builder PROTO_DATE_FIELD =
+          DescriptorProtos.FieldDescriptorProto.newBuilder()
+                  .setName("Date")
+                  .setNumber(1)
+                  .setType(DescriptorProtos.FieldDescriptorProto.Type.TYPE_INT32)
+                  .setLabel(DescriptorProtos.FieldDescriptorProto.Label.LABEL_OPTIONAL);
 
   public final DescriptorProtos.DescriptorProto DESCRIPTOR_PROTO_INTEGER =
       DescriptorProtos.DescriptorProto.newBuilder()
@@ -430,24 +439,22 @@ public class ProtobufUtilsTest {
     }
   }
 
-  public ProtoBufProto.ProtoRows MY_PROTO_ROWS =
-      ProtoBufProto.ProtoRows.newBuilder()
-          .addSerializedRows(
-              DynamicMessage.newBuilder(BIG_SCHEMA_ROW_DESCRIPTOR)
-                  .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(1), 1L)
-                  .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(2), "A")
-                  .addRepeatedField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(3), 0L)
-                  .addRepeatedField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(3), 1L)
-                  .addRepeatedField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(3), 2L)
-                  .setField(
-                      BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(4),
-                      buildSingleRowMessage(MY_STRUCT, STRUCT_DESCRIPTOR, INTERNAL_STRUCT_DATA))
-                  .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(5), 3.14)
-                  .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(6), true)
-                  .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(7), new byte[] {11, 0x7F})
-                  .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(8), 1594080000000L)
-                  .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(9), 1594080000000L)
-                  .build()
-                  .toByteString())
-          .build();
+    public ProtoBufProto.ProtoRows MY_PROTO_ROWS = ProtoBufProto.ProtoRows.newBuilder().addSerializedRows(
+            DynamicMessage.newBuilder(BIG_SCHEMA_ROW_DESCRIPTOR)
+                    .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(1), 1L)
+                    .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(2), "A")
+                    .addRepeatedField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(3), 0L)
+                    .addRepeatedField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(3), 1L)
+                    .addRepeatedField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(3), 2L)
+                    .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(4),
+                            buildSingleRowMessage(
+                                    MY_STRUCT, STRUCT_DESCRIPTOR, INTERNAL_STRUCT_DATA))
+                    .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(5), 3.14)
+                    .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(6), true)
+                    .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(7), Base64.getEncoder().encode(new byte[]{11, 0x7F}))
+                    .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(8), 647133184)
+                    .setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(9), 1594080000000L)
+                    /*.setField(BIG_SCHEMA_ROW_DESCRIPTOR.findFieldByNumber(10),
+                            Base64.getEncoder().encode("-99999999999999999999999999999.999999999".getBytes(UTF_8)))*/ // TODO: current known issues with NUMERIC type conversion, waiting for BigQuery team input.
+                    .build().toByteString()).build();
 }

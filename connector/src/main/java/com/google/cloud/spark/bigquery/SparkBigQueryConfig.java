@@ -15,6 +15,7 @@
  */
 package com.google.cloud.spark.bigquery;
 
+import com.google.api.gax.retrying.RetrySettings;
 import com.google.cloud.bigquery.BigQueryOptions;
 import com.google.cloud.bigquery.FormatOptions;
 import com.google.cloud.bigquery.JobInfo;
@@ -87,6 +88,9 @@ public class SparkBigQueryConfig implements BigQueryConfig {
   ImmutableList<JobInfo.SchemaUpdateOption> loadSchemaUpdateOptions = ImmutableList.of();
   int viewExpirationTimeInHours = 24;
   int maxReadRowsRetries = 3;
+  // for V2 write with BigQuery Storage Write API
+  RetrySettings bigqueryDataWriteHelperRetrySettings =
+      RetrySettings.newBuilder().setMaxAttempts(5).build();
 
   private SparkBigQueryConfig() {
     // empty
@@ -367,6 +371,10 @@ public class SparkBigQueryConfig implements BigQueryConfig {
 
   public int getMaxReadRowsRetries() {
     return maxReadRowsRetries;
+  }
+
+  public RetrySettings getBigqueryDataWriteHelperRetrySettings() {
+    return bigqueryDataWriteHelperRetrySettings;
   }
 
   public ReadSessionCreatorConfig toReadSessionCreatorConfig() {

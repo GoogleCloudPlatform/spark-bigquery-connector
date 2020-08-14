@@ -181,7 +181,7 @@ public class SchemaConverterTest {
 
     try {
       createBigQueryColumn(superRecursiveSchema.fields()[0], 0);
-      fail("Did not detect super-recursive schema of depth = 16.");
+      fail("Did not detect super-recursive schema of depth = 16");
     } catch (IllegalArgumentException e) {
     }
   }
