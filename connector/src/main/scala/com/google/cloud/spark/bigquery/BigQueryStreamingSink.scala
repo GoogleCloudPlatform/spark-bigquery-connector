@@ -49,7 +49,11 @@ case class BigQueryStreamingSink(
       logWarning("Skipping as already committed batch " + batchId)
     } else {
       logDebug(s"addBatch($batchId)")
-      BigQueryStreamWriter.writeBatch(data, sqlContext, outputMode, opts, client)
+      if (!opts.realTime) {
+        BigQueryStreamWriter.writeBatch(data, sqlContext, outputMode, opts, client)
+      } else {
+        BigQueryStreamWriter.writeStream(data, sqlContext, outputMode, opts)
+      }
     }
     latestBatchId = batchId
   }

@@ -64,6 +64,8 @@ import scala.util.Properties
     optimizedEmptyProjection: Boolean = true,
     accessToken: Option[String] = None,
     loadSchemaUpdateOptions: java.util.List[JobInfo.SchemaUpdateOption] = ImmutableList.of(),
+    realTime: Boolean = false,
+    ignoreInsertIds: Boolean = true,
     viewExpirationTimeInHours: Int = 24,
     maxReadRowsRetries: Int = 3
   ) {
@@ -191,13 +193,19 @@ object SparkBigQueryOptions {
       loadSchemaUpdateOptions += JobInfo.SchemaUpdateOption.ALLOW_FIELD_RELAXATION
     }
 
+    val realtime: Boolean = getAnyBooleanOption(
+      normalizedAllConf, parameters, "realtime", false)
+    val ignoreInsertIds: Boolean = getAnyBooleanOption(
+      normalizedAllConf, parameters, "ignoreInsertId", true)
+
     SparkBigQueryOptions(tableId, parentProject, credsParam, credsFileParam,
       filter, schema, maxParallelism, temporaryGcsBucket, persistentGcsBucket,
       persistentGcsPath, intermediateFormat, readDataFormat,
       combinePushedDownFilters, viewsEnabled, materializationProject,
       materializationDataset, datePartitionParam, partitionField, partitionExpirationMs,
       partitionRequireFilter, partitionType, clusteredFields, createDisposition,
-      optimizedEmptyProjection, accessToken, loadSchemaUpdateOptions.asJava)
+      optimizedEmptyProjection, accessToken, loadSchemaUpdateOptions.asJava,
+      realtime, ignoreInsertIds)
   }
 
   private def validateDateFormat(date: String, optionName: String): Unit = {
