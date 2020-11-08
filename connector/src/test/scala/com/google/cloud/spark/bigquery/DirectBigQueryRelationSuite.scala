@@ -63,10 +63,6 @@ class DirectBigQueryRelationSuite
     assert(42L * 1000 * 1000 * 1000 == bigQueryRelation.sizeInBytes)
   }
 
-  test("parallelism") {
-    assert(105 == bigQueryRelation.getMaxNumPartitionsRequested)
-  }
-
   test("schema") {
     val expectedSchema = StructType(Seq(
       StructField("foo", StringType), StructField("bar", LongType)))

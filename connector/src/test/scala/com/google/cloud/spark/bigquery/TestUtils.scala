@@ -25,6 +25,7 @@ object TestUtils {
     SparkSession.builder()
         .appName("spark-bigquery test")
         .master("local")
+        .config("spark.default.parallelism", 20)
         .getOrCreate()
   }
 

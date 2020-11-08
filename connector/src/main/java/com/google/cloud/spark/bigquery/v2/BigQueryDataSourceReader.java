@@ -206,7 +206,7 @@ public class BigQueryDataSourceReader
 
   List<InputPartition<InternalRow>> createEmptyProjectionPartitions() {
     long rowCount = bigQueryClient.calculateTableSize(tableId, globalFilter);
-    int partitionsCount = readSessionCreatorConfig.getDefaultParallelism();
+    int partitionsCount = readSessionCreatorConfig.getMaxParallelism();
     int partitionSize = (int) (rowCount / partitionsCount);
     InputPartition<InternalRow>[] partitions =
         IntStream.range(0, partitionsCount)

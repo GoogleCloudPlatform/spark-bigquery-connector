@@ -65,17 +65,11 @@ public class ReadSessionCreator {
     this.bigQueryReadClientFactory = bigQueryReadClientFactory;
   }
 
-  static int getMaxNumPartitionsRequested(
-      OptionalInt maxParallelism, StandardTableDefinition tableDefinition) {
-    return maxParallelism.orElse(
-        Math.max((int) (tableDefinition.getNumBytes() / DEFAULT_BYTES_PER_PARTITION), 1));
-  }
-
   public ReadSessionResponse create(
       TableId table,
       ImmutableList<String> selectedFields,
       Optional<String> filter,
-      OptionalInt maxParallelism) {
+      int maxParallelism) {
     TableInfo tableDetails = bigQueryClient.getTable(table);
 
     TableInfo actualTable = getActualTable(tableDetails, selectedFields, filter);
@@ -98,7 +92,7 @@ public class ReadSessionCreator {
                           .setDataFormat(config.readDataFormat)
                           .setReadOptions(readOptions)
                           .setTable(tablePath))
-                  .setMaxStreamCount(getMaxNumPartitionsRequested(maxParallelism, tableDefinition))
+                  .setMaxStreamCount(maxParallelism)
                   .build());
 
       return new ReadSessionResponse(readSession, actualTable);

@@ -126,11 +126,10 @@ private[bigquery] class DirectBigQueryRelation(
 
       val client = getClient(options)
 
-      val maxNumPartitionsRequested = getMaxNumPartitionsRequested(actualTableDefinition)
-
       val readDataFormat = options.getReadDataFormat
 
       try {
+        val maxStreamCount = options.getMaxParallelism
         val session = client.createReadSession(
           CreateReadSessionRequest.newBuilder()
             .setParent(s"projects/${options.getParentProjectId}")
@@ -139,7 +138,7 @@ private[bigquery] class DirectBigQueryRelation(
               .setReadOptions(readOptions)
               .setTable(actualTablePath
             ))
-            .setMaxStreamCount(maxNumPartitionsRequested)
+            .setMaxStreamCount(maxStreamCount)
             .build())
         val partitions = session.getStreamsList.asScala.map(_.getName)
           .zipWithIndex.map { case (name, i) => BigQueryPartition(name, i) }
@@ -149,9 +148,9 @@ private[bigquery] class DirectBigQueryRelation(
 
         // This is spammy, but it will make it clear to users the number of partitions they got and
         // why.
-        if (!maxNumPartitionsRequested.equals(partitions.length)) {
+        if (maxStreamCount != partitions.length) {
           logInfo(
-            s"""Requested $maxNumPartitionsRequested max partitions, but only
+            s"""Requested $maxStreamCount max partitions, but only
                |received ${partitions.length} from the BigQuery Storage API for
                |session ${session.getName}. Notice that the number of streams in
                |actual may be lower than the requested number, depending on the
@@ -266,21 +265,6 @@ private[bigquery] class DirectBigQueryRelation(
       s"_sbc_${uuid.getMostSignificantBits.toHexString}${uuid.getLeastSignificantBits.toHexString}"
     TableId.of(project, dataset, name)
   }
-
-  /**
-   * The theoretical number of Partitions of the returned DataFrame.
-   * If the table is small the server will provide fewer readers and there will be fewer
-   * partitions.
-   *
-   * VisibleForTesting
-   */
-  def getMaxNumPartitionsRequested: Int =
-    getMaxNumPartitionsRequested(defaultTableDefinition)
-
-  def getMaxNumPartitionsRequested(tableDefinition: TableDefinition): Int =
-    options.getMaxParallelism
-      .orElse(Math.max(
-        (getNumBytes(tableDefinition) / DEFAULT_BYTES_PER_PARTITION).toInt, 1))
 
   def getNumBytes(tableDefinition: TableDefinition): Long = {
     val tableType = tableDefinition.getType
