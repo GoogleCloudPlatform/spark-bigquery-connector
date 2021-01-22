@@ -18,14 +18,14 @@ package com.google.cloud.bigquery.connector.common;
 import com.google.cloud.bigquery.*;
 import com.google.cloud.http.BaseHttpServiceException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -133,17 +133,33 @@ public class BigQueryClient {
     return bigQuery.create(jobInfo);
   }
 
-  TableResult query(String sql) {
+  public Job dryRunQuery(String sql) {
+    return create(JobInfo.of(createQuery(sql).setDryRun(true).build()));
+  }
+
+  public QueryJobConfiguration.Builder createQuery(String sql) {
+    return QueryJobConfiguration.newBuilder(sql)
+        .setLabels(ImmutableMap.<String, String>of("origin", "spark-bigquery-connector"));
+  }
+
+  public TableResult query(String sql) {
+    return query(createQuery(sql));
+  }
+
+  public TableResult query(QueryJobConfiguration.Builder queryBuilder) {
+    QueryJobConfiguration queryJobConfiguration = queryBuilder.build();
     try {
-      return bigQuery.query(QueryJobConfiguration.of(sql));
+      return bigQuery.query(queryJobConfiguration);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new BigQueryException(
-          BaseHttpServiceException.UNKNOWN_CODE, format("Failed to run the query [%s]", sql), e);
+          BaseHttpServiceException.UNKNOWN_CODE,
+          format("Failed to run the query [%s]", queryJobConfiguration.getQuery()),
+          e);
     }
   }
 
-  String createSql(TableId table, ImmutableList<String> requiredColumns, String[] filters) {
+  public String createSql(TableId table, ImmutableList<String> requiredColumns, String[] filters) {
     String columns =
         requiredColumns.isEmpty()
             ? "*"
@@ -154,9 +170,9 @@ public class BigQueryClient {
     return createSql(table, columns, filters);
   }
 
-  // assuming the SELECT part is properly formatted, can be used to call functions such as COUNT and
+  // Assuming the SELECT part is properly formatted, can be used to call functions such as COUNT and
   // SUM
-  String createSql(TableId table, String formattedQuery, String[] filters) {
+  public String createSql(TableId table, String formattedQuery, String[] filters) {
     String tableName = fullTableName(table);
 
     String whereClause = createWhereClause(filters).map(clause -> "WHERE " + clause).orElse("");
@@ -165,35 +181,59 @@ public class BigQueryClient {
   }
 
   String fullTableName(TableId tableId) {
-    return format("%s.%s.%s", tableId.getProject(), tableId.getDataset(), tableId.getTable());
+    return tableId.getProject() != null
+        ? format("%s.%s.%s", tableId.getProject(), tableId.getDataset(), tableId.getTable())
+        : format("%s.%s", tableId.getDataset(), tableId.getTable());
   }
 
-  public long calculateTableSize(TableId tableId, Optional<String> filter) {
+  public TableStatistics calculateTableSize(TableId tableId, Optional<String> filter) {
     return calculateTableSize(getTable(tableId), filter);
   }
 
-  public long calculateTableSize(TableInfo tableInfo, Optional<String> filter) {
-    try {
-      TableDefinition.Type type = tableInfo.getDefinition().getType();
-      if (type == TableDefinition.Type.TABLE && !filter.isPresent()) {
-        return tableInfo.getNumRows().longValue();
-      } else if (type == TableDefinition.Type.VIEW
-          || type == TableDefinition.Type.MATERIALIZED_VIEW
-          || (type == TableDefinition.Type.TABLE && filter.isPresent())) {
-        // run a query
-        String table = fullTableName(tableInfo.getTableId());
-        String sql = format("SELECT COUNT(*) from `%s` WHERE %s", table, filter.get());
-        TableResult result = bigQuery.query(QueryJobConfiguration.of(sql));
-        return result.iterateAll().iterator().next().get(0).getLongValue();
-      } else {
-        throw new IllegalArgumentException(
-            format(
-                "Unsupported table type %s for table %s",
-                type, fullTableName(tableInfo.getTableId())));
-      }
-    } catch (InterruptedException e) {
-      throw new BigQueryConnectorException(
-          "Querying table size was interrupted on the client side", e);
+  public TableStatistics calculateTableSize(TableInfo tableInfo, Optional<String> filter) {
+    TableDefinition.Type type = tableInfo.getDefinition().getType();
+    if (type == TableDefinition.Type.TABLE) {
+      // If this is a table, there's no need to query the total number of rows as we can take it
+      // from the TableInfo
+      OptionalLong numberOfFilteredRows =
+          toOptionalLong(
+              filter
+                  .map(f -> countWithFilter(tableInfo.getTableId(), f))
+                  .map(row -> row.get(0).getLongValue()));
+      return new TableStatistics(tableInfo.getNumRows().longValue(), numberOfFilteredRows);
+    } else if (type == TableDefinition.Type.VIEW
+        || type == TableDefinition.Type.MATERIALIZED_VIEW) {
+      // For views, we need to calculate the number of rows
+      String table = fullTableName(tableInfo.getTableId());
+      String sql =
+          filter
+              .map(f -> format("SELECT COUNT(*), COUNTIF(%s) from `%s`", f, table))
+              .orElse(format("SELECT  COUNT(*) from `%s`", table));
+      FieldValueList row = queryForSingleRow(sql);
+      long numberOfRows = row.get(0).getLongValue();
+      OptionalLong numberOfFilteredRows =
+          toOptionalLong(filter.map(ignored -> row.get(1).getLongValue()));
+      return new TableStatistics(numberOfRows, numberOfFilteredRows);
+    } else {
+      throw new IllegalArgumentException(
+          format(
+              "Unsupported table type %s for table %s",
+              type, fullTableName(tableInfo.getTableId())));
     }
+  }
+
+  private OptionalLong toOptionalLong(Optional<Long> opt) {
+    return opt.map(LongStream::of).orElseGet(LongStream::empty).findFirst();
+  }
+
+  private FieldValueList countWithFilter(TableId tableId, String filter) {
+    String table = fullTableName(tableId);
+    String sql = format("SELECT COUNT(*) from `%s` WHERE %s", table, filter);
+    return queryForSingleRow(sql);
+  }
+
+  private FieldValueList queryForSingleRow(String sql) {
+    TableResult result = query(sql);
+    return result.iterateAll().iterator().next();
   }
 }

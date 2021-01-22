@@ -49,7 +49,8 @@ lazy val commonTestDependencies = Seq(
   "org.mockito" %% "mockito-scala-scalatest" % "1.10.0" % "test",
   "junit" % "junit" % "4.13" % "test",
   "com.novocode" % "junit-interface" % "0.11" % "test",
-  "com.google.truth" % "truth" % "1.0.1" % "test"
+  "com.google.truth" % "truth" % "1.1" % "test",
+  "com.google.truth.extensions" % "truth-java8-extension" % "1.1" % "test"
 )
 
 lazy val connector = (project in file("connector"))

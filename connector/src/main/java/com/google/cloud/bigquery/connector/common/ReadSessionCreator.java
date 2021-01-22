@@ -180,8 +180,7 @@ public class ReadSessionCreator {
       TableId destinationTable = bigQueryClient.createDestinationTable(table);
       log.debug("destinationTable is %s", destinationTable);
       JobInfo jobInfo =
-          JobInfo.of(
-              QueryJobConfiguration.newBuilder(querySql)
+          JobInfo.of(bigQueryClient.createQuery(querySql)
                   .setDestinationTable(destinationTable)
                   .build());
       log.debug("running query %s", jobInfo);
