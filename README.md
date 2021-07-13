@@ -198,9 +198,37 @@ In order to use this feature the following configurations MUST be set:
 * `materializationDataset` must be set to a dataset where the GCP user has table
   creation permission. `materializationProject` is optional.
 
+**Note:** As mentioned in the [BigQuery documentation](https://cloud.google.com/bigquery/docs/writing-results#temporary_and_permanent_tables),
+the queried tables must be in the same location as the `materializationDataset`.
+Also, if the tables in the `SQL statement` are from projects other than the
+`parentProject` then use the fully qualified table name i.e.
+`[project].[dataset].[table]`.
+
 **Important:** This feature is implemented by running the query on BigQuery and
 saving the result into a temporary table, of which Spark will read the results
 from. This may add additional costs on your BigQuery account.
+
+### Reading From Views
+
+The connector has a preliminary support for reading from
+[BigQuery views](https://cloud.google.com/bigquery/docs/views-intro). Please
+note there are a few caveats:
+
+* BigQuery views are not materialized by default, which means that the connector
+  needs to materialize them before it can read them. This process affects the
+  read performance, even before running any `collect()` or `count()` action.
+* The materialization process can also incur additional costs to your BigQuery
+  bill.
+* By default, the materialized views are created in the same project and
+  dataset. Those can be configured by the optional `viewMaterializationProject`
+  and `viewMaterializationDataset` options, respectively. These options can also
+  be globally set by calling `spark.conf.set(...)` before reading the views.
+* Reading from views is **disabled** by default. In order to enable it,
+  either set the viewsEnabled option when reading the specific view
+  (`.option("viewsEnabled", "true")`) or set it globally by calling
+  `spark.conf.set("viewsEnabled", "true")`.
+* As mentioned in the [BigQuery documentation](https://cloud.google.com/bigquery/docs/writing-results#temporary_and_permanent_tables),
+the `viewMaterializationDataset` should be in same location as the view.
 
 ### Writing data to BigQuery
 
@@ -263,7 +291,8 @@ The API Supports a number of options to configure the read
   <tr valign="top">
    <td><code>dataset</code>
    </td>
-   <td>The dataset containing the table.
+   <td>The dataset containing the table. This option should be used with
+   standard table and views, but not when loading query results.
        <br/>(Optional unless omitted in <code>table</code>)
    </td>
    <td>Read/Write</td>
@@ -271,7 +300,8 @@ The API Supports a number of options to configure the read
   <tr valign="top">
    <td><code>project</code>
    </td>
-   <td>The Google Cloud Project ID of the table.
+   <td>The Google Cloud Project ID of the table. This option should be used with
+   standard table and views, but not when loading query results.
        <br/>(Optional. Defaults to the project of the Service Account being used)
    </td>
    <td>Read/Write</td>
@@ -320,7 +350,8 @@ The API Supports a number of options to configure the read
   <tr valign="top">
    <td><code>materializationDataset</code>
    </td>
-   <td>The dataset where the materialized view is going to be created
+   <td>The dataset where the materialized view is going to be created. This
+   dataset should be in same location as the view or the queried tables.
        <br/>(Optional. Defaults to view's dataset)
    </td>
    <td>Read</td>
@@ -673,26 +704,6 @@ val df = spark.read.format("bigquery")
 
 By default the connector creates one partition per 400MB in the table being read (before filtering). This should roughly correspond to the maximum number of readers supported by the BigQuery Storage API.
 This can be configured explicitly with the <code>[parallelism](#properties)</code> property. BigQuery may limit the number of partitions based on server constraints.
-
-### Reading From Views
-
-The connector has a preliminary support for reading from
-[BigQuery views](https://cloud.google.com/bigquery/docs/views-intro). Please
-note there are a few caveats:
-
-* BigQuery views are not materialized by default, which means that the connector
-  needs to materialize them before it can read them. This process affects the
-  read performance, even before running any `collect()` or `count()` action.
-* The materialization process can also incur additional costs to your BigQuery
-  bill.
-* By default, the materialized views are created in the same project and
-  dataset. Those can be configured by the optional `viewMaterializationProject`
-  and `viewMaterializationDataset` options, respectively. These options can also
-  be globally set by calling `spark.conf.set(...)` before reading the views.
-* Reading from views is **disabled** by default. In order to enable it,
-  either set the viewsEnabled option when reading the specific view
-  (`.option("viewsEnabled", "true")`) or set it globally by calling
-  `spark.conf.set("viewsEnabled", "true")`.
 
 ## Using in Jupyter Notebooks
 
