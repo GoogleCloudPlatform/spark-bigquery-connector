@@ -5,7 +5,8 @@ import scala.runtime.AbstractFunction1;
 import java.io.Serializable;
 import java.util.function.Function;
 
-public class SerializableAbstractFunction1<T, U> extends AbstractFunction1<T, U> implements Serializable {
+public class SerializableAbstractFunction1<T, U> extends AbstractFunction1<T, U>
+    implements Serializable {
   private Function<T, U> func;
 
   SerializableAbstractFunction1(Function<T, U> func) {

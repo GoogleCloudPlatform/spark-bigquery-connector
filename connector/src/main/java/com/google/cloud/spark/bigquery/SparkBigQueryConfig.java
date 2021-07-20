@@ -22,11 +22,7 @@ import com.google.cloud.bigquery.FormatOptions;
 import com.google.cloud.bigquery.JobInfo;
 import com.google.cloud.bigquery.TableId;
 import com.google.cloud.bigquery.TimePartitioning;
-import com.google.cloud.bigquery.connector.common.BigQueryClient;
-import com.google.cloud.bigquery.connector.common.BigQueryConfig;
-import com.google.cloud.bigquery.connector.common.BigQueryCredentialsSupplier;
-import com.google.cloud.bigquery.connector.common.ReadSessionCreatorConfig;
-import com.google.cloud.bigquery.connector.common.ReadSessionCreatorConfigBuilder;
+import com.google.cloud.bigquery.connector.common.*;
 import com.google.cloud.bigquery.storage.v1.DataFormat;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -86,6 +82,7 @@ public class SparkBigQueryConfig implements BigQueryConfig, Serializable {
   // 0 or less would make code hang or other bad side effects.
   public static final int MIN_BUFFERED_RESPONSES_PER_STREAM = 1;
   public static final int MIN_STREAMS_PER_PARTITION = 1;
+  private static final int DEFAULT_BIGQUERY_CLIENT_RETRIES = 10;
   TableId tableId;
   // as the config needs to be Serializable, internally it uses
   // com.google.common.base.Optional<String> but externally it uses the regular java.util.Optional
@@ -125,6 +122,7 @@ public class SparkBigQueryConfig implements BigQueryConfig, Serializable {
   private int numBackgroundThreadsPerStream = 0;
   private int numPrebufferReadRowsResponses = MIN_BUFFERED_RESPONSES_PER_STREAM;
   private int numStreamsPerPartition = MIN_STREAMS_PER_PARTITION;
+  private SparkBigQueryProxyAndHttpConfig sparkBigQueryProxyAndHttpConfig;
 
   @VisibleForTesting
   SparkBigQueryConfig() {
@@ -143,7 +141,8 @@ public class SparkBigQueryConfig implements BigQueryConfig, Serializable {
     SparkBigQueryConfig config = new SparkBigQueryConfig();
 
     ImmutableMap<String, String> globalOptions = normalizeConf(originalGlobalOptions);
-
+    config.sparkBigQueryProxyAndHttpConfig =
+        SparkBigQueryProxyAndHttpConfig.from(options, globalOptions, hadoopConfiguration);
     // Issue #247
     // we need those parameters in case a read from query is issued
     config.viewsEnabled = getAnyBooleanOption(globalOptions, options, VIEWS_ENABLED_OPTION, false);
@@ -410,8 +409,14 @@ public class SparkBigQueryConfig implements BigQueryConfig, Serializable {
   }
 
   public Credentials createCredentials() {
+
     return new BigQueryCredentialsSupplier(
-            accessToken.toJavaUtil(), credentialsKey.toJavaUtil(), credentialsFile.toJavaUtil())
+            accessToken.toJavaUtil(),
+            credentialsKey.toJavaUtil(),
+            credentialsFile.toJavaUtil(),
+            sparkBigQueryProxyAndHttpConfig.getProxyUri(),
+            sparkBigQueryProxyAndHttpConfig.getProxyUsername(),
+            sparkBigQueryProxyAndHttpConfig.getProxyPassword())
         .getCredentials();
   }
 
@@ -569,17 +574,30 @@ public class SparkBigQueryConfig implements BigQueryConfig, Serializable {
 
   @Override
   public int getBigQueryClientConnectTimeout() {
-    return DEFAULT_BIGQUERY_CLIENT_CONNECT_TIMEOUT;
+    return sparkBigQueryProxyAndHttpConfig
+        .getHttpConnectTimeout()
+        .orElse(DEFAULT_BIGQUERY_CLIENT_CONNECT_TIMEOUT);
   }
 
   @Override
   public int getBigQueryClientReadTimeout() {
-    return DEFAULT_BIGQUERY_CLIENT_READ_TIMEOUT;
+    return sparkBigQueryProxyAndHttpConfig
+        .getHttpReadTimeout()
+        .orElse(DEFAULT_BIGQUERY_CLIENT_READ_TIMEOUT);
+  }
+
+  @Override
+  public BigQueryProxyConfig getBigQueryProxyConfig() {
+    return sparkBigQueryProxyAndHttpConfig;
   }
 
   @Override
   public RetrySettings getBigQueryClientRetrySettings() {
     return RetrySettings.newBuilder()
+        .setMaxAttempts(
+            sparkBigQueryProxyAndHttpConfig
+                .getHttpMaxRetry()
+                .orElse(DEFAULT_BIGQUERY_CLIENT_RETRIES))
         .setTotalTimeout(Duration.ofMinutes(10))
         .setInitialRpcTimeout(Duration.ofSeconds(60))
         .setMaxRpcTimeout(Duration.ofMinutes(5))

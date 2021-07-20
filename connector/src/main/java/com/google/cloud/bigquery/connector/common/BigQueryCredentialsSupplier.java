@@ -17,6 +17,7 @@ package com.google.cloud.bigquery.connector.common;
 
 import com.google.api.client.util.Base64;
 import com.google.auth.Credentials;
+import com.google.auth.http.HttpTransportFactory;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 
@@ -24,6 +25,7 @@ import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.util.Optional;
 
 public class BigQueryCredentialsSupplier {
@@ -32,13 +34,18 @@ public class BigQueryCredentialsSupplier {
   public BigQueryCredentialsSupplier(
       Optional<String> accessToken,
       Optional<String> credentialsKey,
-      Optional<String> credentialsFile) {
+      Optional<String> credentialsFile,
+      Optional<URI> proxyUri,
+      Optional<String> proxyUsername,
+      Optional<String> proxyPassword) {
     if (accessToken.isPresent()) {
       this.credentials = createCredentialsFromAccessToken(accessToken.get());
     } else if (credentialsKey.isPresent()) {
-      this.credentials = createCredentialsFromKey(credentialsKey.get());
+      this.credentials =
+          createCredentialsFromKey(credentialsKey.get(), proxyUri, proxyUsername, proxyPassword);
     } else if (credentialsFile.isPresent()) {
-      this.credentials = createCredentialsFromFile(credentialsFile.get());
+      this.credentials =
+          createCredentialsFromFile(credentialsFile.get(), proxyUri, proxyUsername, proxyPassword);
     } else {
       this.credentials = createDefaultCredentials();
     }
@@ -48,17 +55,40 @@ public class BigQueryCredentialsSupplier {
     return GoogleCredentials.create(new AccessToken(accessToken, null));
   }
 
-  private static Credentials createCredentialsFromKey(String key) {
+  private static Credentials createCredentialsFromKey(
+      String key,
+      Optional<URI> proxyUri,
+      Optional<String> proxyUsername,
+      Optional<String> proxyPassword) {
     try {
-      return GoogleCredentials.fromStream(new ByteArrayInputStream(Base64.decodeBase64(key)));
+      if (proxyUri.isPresent()) {
+        HttpTransportFactory httpTransportFactory =
+            BigQueryProxyTransporterBuilder.createHttpTransportFactory(
+                proxyUri, proxyUsername, proxyPassword);
+        return GoogleCredentials.fromStream(
+            new ByteArrayInputStream(Base64.decodeBase64(key)), httpTransportFactory);
+      } else {
+        return GoogleCredentials.fromStream(new ByteArrayInputStream(Base64.decodeBase64(key)));
+      }
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to create Credentials from key", e);
     }
   }
 
-  private static Credentials createCredentialsFromFile(String file) {
+  private static Credentials createCredentialsFromFile(
+      String file,
+      Optional<URI> proxyUri,
+      Optional<String> proxyUsername,
+      Optional<String> proxyPassword) {
     try {
-      return GoogleCredentials.fromStream(new FileInputStream(file));
+      if (proxyUri.isPresent()) {
+        HttpTransportFactory httpTransportFactory =
+            BigQueryProxyTransporterBuilder.createHttpTransportFactory(
+                proxyUri, proxyUsername, proxyPassword);
+        return GoogleCredentials.fromStream(new FileInputStream(file), httpTransportFactory);
+      } else {
+        return GoogleCredentials.fromStream(new FileInputStream(file));
+      }
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to create Credentials from file", e);
     }

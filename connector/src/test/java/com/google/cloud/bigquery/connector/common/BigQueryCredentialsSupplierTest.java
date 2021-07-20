@@ -23,14 +23,13 @@ import com.google.auth.oauth2.ServiceAccountCredentials;
 import org.junit.Test;
 
 import java.io.File;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Optional;
+import java.util.*;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 public class BigQueryCredentialsSupplierTest {
 
@@ -60,16 +59,42 @@ public class BigQueryCredentialsSupplierTest {
   private static final String ACCESS_TOKEN = "1/MkSJoj1xsli0AccessToken_NKPY2";
   private static final Collection<String> SCOPES = Collections.singletonList("dummy.scope");
   private static final String QUOTA_PROJECT = "sample-quota-project-id";
+  private static final Optional<URI> optionalProxyURI =
+      Optional.of(URI.create("http://bq-connector-host:1234"));
+  private static final Optional<String> optionalProxyUserName = Optional.of("credential-user");
+  private static final Optional<String> optionalProxyPassword = Optional.of("credential-password");
 
   @Test
-  public void testCredentialsFromAccessToken() throws Exception {
-    Credentials credentials =
+  public void testCredentialsFromAccessToken() {
+    Credentials nonProxyCredentials =
         new BigQueryCredentialsSupplier(
-                Optional.of(ACCESS_TOKEN), Optional.empty(), Optional.empty())
+                Optional.of(ACCESS_TOKEN),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty())
             .getCredentials();
-    assertThat(credentials).isInstanceOf(GoogleCredentials.class);
-    GoogleCredentials googleCredentials = (GoogleCredentials) credentials;
-    assertThat(googleCredentials.getAccessToken().getTokenValue()).isEqualTo(ACCESS_TOKEN);
+
+    Credentials proxyCredentials =
+        new BigQueryCredentialsSupplier(
+                Optional.of(ACCESS_TOKEN),
+                Optional.empty(),
+                Optional.empty(),
+                optionalProxyURI,
+                optionalProxyUserName,
+                optionalProxyPassword)
+            .getCredentials();
+
+    // the output should be same for both proxyCredentials and nonProxyCredentials
+    Arrays.asList(nonProxyCredentials, proxyCredentials).stream()
+        .forEach(
+            credentials -> {
+              assertThat(credentials).isInstanceOf(GoogleCredentials.class);
+              GoogleCredentials googleCredentials = (GoogleCredentials) credentials;
+              assertThat(googleCredentials.getAccessToken().getTokenValue())
+                  .isEqualTo(ACCESS_TOKEN);
+            });
   }
 
   @Test
@@ -78,16 +103,80 @@ public class BigQueryCredentialsSupplierTest {
     String credentialsKey =
         Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
 
-    Credentials credentials =
+    Credentials nonProxyCredentials =
         new BigQueryCredentialsSupplier(
-                Optional.empty(), Optional.of(credentialsKey), Optional.empty())
+                Optional.empty(),
+                Optional.of(credentialsKey),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty())
             .getCredentials();
-    assertThat(credentials).isInstanceOf(ServiceAccountCredentials.class);
-    ServiceAccountCredentials serviceAccountCredentials = (ServiceAccountCredentials) credentials;
-    assertThat(serviceAccountCredentials.getProjectId()).isEqualTo("key");
-    assertThat(serviceAccountCredentials.getClientEmail()).isEqualTo(CLIENT_EMAIL);
-    assertThat(serviceAccountCredentials.getClientId()).isEqualTo(CLIENT_ID);
-    assertThat(serviceAccountCredentials.getQuotaProjectId()).isEqualTo(QUOTA_PROJECT);
+
+    Credentials proxyCredentials =
+        new BigQueryCredentialsSupplier(
+                Optional.empty(),
+                Optional.of(credentialsKey),
+                Optional.empty(),
+                optionalProxyURI,
+                optionalProxyUserName,
+                optionalProxyPassword)
+            .getCredentials();
+
+    // the output should be same for both proxyCredentials and nonProxyCredentials
+    Arrays.asList(nonProxyCredentials, proxyCredentials).stream()
+        .forEach(
+            credentials -> {
+              assertThat(credentials).isInstanceOf(ServiceAccountCredentials.class);
+              ServiceAccountCredentials serviceAccountCredentials =
+                  (ServiceAccountCredentials) credentials;
+              assertThat(serviceAccountCredentials.getProjectId()).isEqualTo("key");
+              assertThat(serviceAccountCredentials.getClientEmail()).isEqualTo(CLIENT_EMAIL);
+              assertThat(serviceAccountCredentials.getClientId()).isEqualTo(CLIENT_ID);
+              assertThat(serviceAccountCredentials.getQuotaProjectId()).isEqualTo(QUOTA_PROJECT);
+            });
+  }
+
+  @Test
+  public void testCredentialsFromKeyWithErrors() throws Exception {
+    String json = createServiceAccountJson("key");
+    String credentialsKey =
+        Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+
+    IllegalArgumentException exceptionWithPassword =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new BigQueryCredentialsSupplier(
+                        Optional.empty(),
+                        Optional.of(credentialsKey),
+                        Optional.empty(),
+                        optionalProxyURI,
+                        Optional.empty(),
+                        optionalProxyPassword)
+                    .getCredentials());
+
+    IllegalArgumentException exceptionWithUserName =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new BigQueryCredentialsSupplier(
+                        Optional.empty(),
+                        Optional.of(credentialsKey),
+                        Optional.empty(),
+                        optionalProxyURI,
+                        optionalProxyUserName,
+                        Optional.empty())
+                    .getCredentials());
+
+    Arrays.asList(exceptionWithPassword, exceptionWithUserName).stream()
+        .forEach(
+            exception -> {
+              assertThat(exception)
+                  .hasMessageThat()
+                  .contains(
+                      "Both proxyUsername and proxyPassword should be defined or not defined together");
+            });
   }
 
   @Test
@@ -97,16 +186,81 @@ public class BigQueryCredentialsSupplierTest {
     credentialsFile.deleteOnExit();
     Files.write(credentialsFile.toPath(), json.getBytes(StandardCharsets.UTF_8));
 
-    Credentials credentials =
+    Credentials nonProxyCredentials =
         new BigQueryCredentialsSupplier(
-                Optional.empty(), Optional.empty(), Optional.of(credentialsFile.getAbsolutePath()))
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(credentialsFile.getAbsolutePath()),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty())
             .getCredentials();
-    assertThat(credentials).isInstanceOf(ServiceAccountCredentials.class);
-    ServiceAccountCredentials serviceAccountCredentials = (ServiceAccountCredentials) credentials;
-    assertThat(serviceAccountCredentials.getProjectId()).isEqualTo("file");
-    assertThat(serviceAccountCredentials.getClientEmail()).isEqualTo(CLIENT_EMAIL);
-    assertThat(serviceAccountCredentials.getClientId()).isEqualTo(CLIENT_ID);
-    assertThat(serviceAccountCredentials.getQuotaProjectId()).isEqualTo(QUOTA_PROJECT);
+
+    Credentials proxyCredentials =
+        new BigQueryCredentialsSupplier(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(credentialsFile.getAbsolutePath()),
+                optionalProxyURI,
+                optionalProxyUserName,
+                optionalProxyPassword)
+            .getCredentials();
+
+    // the output should be same for both proxyCredentials and nonProxyCredentials
+    Arrays.asList(nonProxyCredentials, proxyCredentials).stream()
+        .forEach(
+            credentials -> {
+              assertThat(credentials).isInstanceOf(ServiceAccountCredentials.class);
+              ServiceAccountCredentials serviceAccountCredentials =
+                  (ServiceAccountCredentials) credentials;
+              assertThat(serviceAccountCredentials.getProjectId()).isEqualTo("file");
+              assertThat(serviceAccountCredentials.getClientEmail()).isEqualTo(CLIENT_EMAIL);
+              assertThat(serviceAccountCredentials.getClientId()).isEqualTo(CLIENT_ID);
+              assertThat(serviceAccountCredentials.getQuotaProjectId()).isEqualTo(QUOTA_PROJECT);
+            });
+  }
+
+  @Test
+  public void testCredentialsFromFileWithErrors() throws Exception {
+    String json = createServiceAccountJson("file");
+    File credentialsFile = File.createTempFile("dummy-credentials", ".json");
+    credentialsFile.deleteOnExit();
+    Files.write(credentialsFile.toPath(), json.getBytes(StandardCharsets.UTF_8));
+
+    IllegalArgumentException exceptionWithPassword =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new BigQueryCredentialsSupplier(
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.of(credentialsFile.getAbsolutePath()),
+                        optionalProxyURI,
+                        Optional.empty(),
+                        optionalProxyPassword)
+                    .getCredentials());
+
+    IllegalArgumentException exceptionWithUserName =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new BigQueryCredentialsSupplier(
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.of(credentialsFile.getAbsolutePath()),
+                        optionalProxyURI,
+                        optionalProxyUserName,
+                        Optional.empty())
+                    .getCredentials());
+
+    Arrays.asList(exceptionWithPassword, exceptionWithUserName).stream()
+        .forEach(
+            exception -> {
+              assertThat(exception)
+                  .hasMessageThat()
+                  .contains(
+                      "Both proxyUsername and proxyPassword should be defined or not defined together");
+            });
   }
 
   private String createServiceAccountJson(String projectId) throws Exception {

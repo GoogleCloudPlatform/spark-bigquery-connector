@@ -40,4 +40,6 @@ public interface BigQueryConfig {
   int getBigQueryClientReadTimeout();
 
   RetrySettings getBigQueryClientRetrySettings();
+
+  BigQueryProxyConfig getBigQueryProxyConfig();
 }

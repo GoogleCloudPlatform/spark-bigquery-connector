@@ -43,8 +43,14 @@ public class BigQueryClientModule implements com.google.inject.Module {
   @Provides
   @Singleton
   public BigQueryCredentialsSupplier provideBigQueryCredentialsSupplier(BigQueryConfig config) {
+    BigQueryProxyConfig proxyConfig = config.getBigQueryProxyConfig();
     return new BigQueryCredentialsSupplier(
-        config.getAccessToken(), config.getCredentialsKey(), config.getCredentialsFile());
+        config.getAccessToken(),
+        config.getCredentialsKey(),
+        config.getCredentialsFile(),
+        proxyConfig.getProxyUri(),
+        proxyConfig.getProxyUsername(),
+        proxyConfig.getProxyPassword());
   }
 
   @Provides
@@ -58,12 +64,22 @@ public class BigQueryClientModule implements com.google.inject.Module {
             .setHeaderProvider(userAgentHeaderProvider)
             .setProjectId(config.getParentProjectId())
             .setCredentials(bigQueryCredentialsSupplier.getCredentials())
-            .setRetrySettings(config.getBigQueryClientRetrySettings())
-            .setTransportOptions(
-                HttpTransportOptions.newBuilder()
-                    .setConnectTimeout(config.getBigQueryClientConnectTimeout())
-                    .setReadTimeout(config.getBigQueryClientReadTimeout())
-                    .build());
+            .setRetrySettings(config.getBigQueryClientRetrySettings());
+
+    HttpTransportOptions.Builder httpTransportOptionsBuilder =
+        HttpTransportOptions.newBuilder()
+            .setConnectTimeout(config.getBigQueryClientConnectTimeout())
+            .setReadTimeout(config.getBigQueryClientReadTimeout());
+    BigQueryProxyConfig proxyConfig = config.getBigQueryProxyConfig();
+    if (proxyConfig.getProxyUri().isPresent()) {
+      httpTransportOptionsBuilder.setHttpTransportFactory(
+          BigQueryProxyTransporterBuilder.createHttpTransportFactory(
+              proxyConfig.getProxyUri(),
+              proxyConfig.getProxyUsername(),
+              proxyConfig.getProxyPassword()));
+    }
+
+    options.setTransportOptions(httpTransportOptionsBuilder.build());
     return new BigQueryClient(
         options.build().getService(),
         config.getMaterializationProject(),

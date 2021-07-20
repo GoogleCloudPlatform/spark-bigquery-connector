@@ -92,6 +92,9 @@ public class SparkBigQueryConfigTest {
     assertThat(config.getMaterializationExpirationTimeInMinutes()).isEqualTo(24 * 60);
     assertThat(config.getMaxReadRowsRetries()).isEqualTo(3);
     assertThat(config.isUseAvroLogicalTypes()).isFalse();
+    assertThat(config.getBigQueryClientConnectTimeout()).isEqualTo(60 * 1000);
+    assertThat(config.getBigQueryClientReadTimeout()).isEqualTo(60 * 1000);
+    assertThat(config.getBigQueryClientRetrySettings().getMaxAttempts()).isEqualTo(10);
   }
 
   @Test
@@ -123,6 +126,9 @@ public class SparkBigQueryConfigTest {
                 .put("clusteredFields", "field1,field2")
                 .put("allowFieldAddition", "true")
                 .put("allowFieldRelaxation", "true")
+                .put("httpConnectTimeout", "10000")
+                .put("httpReadTimeout", "20000")
+                .put("httpMaxRetry", "5")
                 .build());
     SparkBigQueryConfig config =
         SparkBigQueryConfig.from(
@@ -158,6 +164,9 @@ public class SparkBigQueryConfigTest {
     assertThat(config.getMaterializationExpirationTimeInMinutes()).isEqualTo(100);
     assertThat(config.getMaxReadRowsRetries()).isEqualTo(3);
     assertThat(config.isUseAvroLogicalTypes()).isTrue();
+    assertThat(config.getBigQueryClientConnectTimeout()).isEqualTo(10000);
+    assertThat(config.getBigQueryClientReadTimeout()).isEqualTo(20000);
+    assertThat(config.getBigQueryClientRetrySettings().getMaxAttempts()).isEqualTo(5);
   }
 
   @Test

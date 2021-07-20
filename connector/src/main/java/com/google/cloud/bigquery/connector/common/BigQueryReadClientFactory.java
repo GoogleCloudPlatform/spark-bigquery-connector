@@ -20,14 +20,14 @@ import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.auth.Credentials;
 import com.google.cloud.bigquery.storage.v1.BigQueryReadClient;
 import com.google.cloud.bigquery.storage.v1.BigQueryReadSettings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
 import javax.inject.Inject;
 import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Optional;
 
 /**
  * Since Guice recommends to avoid injecting closeable resources (see
@@ -40,14 +40,17 @@ public class BigQueryReadClientFactory implements Serializable {
   private final Credentials credentials;
   // using the user agent as HeaderProvider is not serializable
   private final UserAgentHeaderProvider userAgentHeaderProvider;
+  private final BigQueryConfig bqConfig;
 
   @Inject
   public BigQueryReadClientFactory(
       BigQueryCredentialsSupplier bigQueryCredentialsSupplier,
-      UserAgentHeaderProvider userAgentHeaderProvider) {
+      UserAgentHeaderProvider userAgentHeaderProvider,
+      BigQueryConfig bqConfig) {
     // using Guava's optional as it is serializable
     this.credentials = bigQueryCredentialsSupplier.getCredentials();
     this.userAgentHeaderProvider = userAgentHeaderProvider;
+    this.bqConfig = bqConfig;
   }
 
   public BigQueryReadClient createBigQueryReadClient(Optional<String> endpoint) {
@@ -55,6 +58,14 @@ public class BigQueryReadClientFactory implements Serializable {
       InstantiatingGrpcChannelProvider.Builder transportBuilder =
           BigQueryReadSettings.defaultGrpcTransportProviderBuilder()
               .setHeaderProvider(userAgentHeaderProvider);
+      BigQueryProxyConfig proxyConfig = bqConfig.getBigQueryProxyConfig();
+      if (proxyConfig.getProxyUri().isPresent()) {
+        transportBuilder.setChannelConfigurator(
+            BigQueryProxyTransporterBuilder.createGrpcChannelConfigurator(
+                proxyConfig.getProxyUri(),
+                proxyConfig.getProxyUsername(),
+                proxyConfig.getProxyPassword()));
+      }
       endpoint.ifPresent(
           e -> {
             log.info("Overriding endpoint to: ", e);
