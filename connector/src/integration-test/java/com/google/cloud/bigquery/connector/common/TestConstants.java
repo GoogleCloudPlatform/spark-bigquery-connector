@@ -31,6 +31,7 @@ import static org.apache.spark.sql.functions.*;
 
 public class TestConstants {
     private static DataType BQ_NUMERIC = DataTypes.createDecimalType(38, 9);
+    public static int BIG_NUMERIC_COLUMN_POSITION = 11;
 
     public static StructType ALL_TYPES_TABLE_SCHEMA = new StructType(copy(
             new StructField("int_req", DataTypes.LongType, false, Metadata.empty()),
@@ -50,6 +51,11 @@ public class TestConstants {
                             new StructField("pi", BQ_NUMERIC, true, Metadata.empty()),
                             new StructField("big_pi", BQ_NUMERIC, true, Metadata.empty()))),
                     true, Metadata.empty()),
+            new StructField("big_numeric_nums",
+                    new StructType(copy(
+                            new StructField("min", BigQueryDataTypes.BigNumericType, nullable = true),
+                            new StructField("max", BigQueryDataTypes.BigNumericType, nullable = true))),
+                    nullable = true),
             new StructField("int_arr", new ArrayType(DataTypes.LongType, true), true, Metadata.empty()),
             new StructField("int_struct_arr", new ArrayType(
                     new StructType(copy(new StructField("i", DataTypes.LongType, true, Metadata.empty()))), true),
@@ -71,6 +77,7 @@ public class TestConstants {
                     "binary bytes,",
                     "float float64,",
                     "nums struct<min numeric, max numeric, pi numeric, big_pi numeric>,",
+                    "big_numeric_nums struct<min bignumeric, max bignumeric>,",
                     "int_arr array<int64>,",
                     "int_struct_arr array<struct<i int64>>",
                     ") as",
@@ -96,7 +103,7 @@ public class TestConstants {
                     "[(select as struct 1)] as int_struct_arr"
             ).collect(Collectors.joining("\n"));
 
-    public static int ALL_TYPES_TABLE_SIZE = 160;
+    public static int ALL_TYPES_TABLE_SIZE = 224;
 
     public static List<Column> ALL_TYPES_TABLE_COLS = Arrays.asList(
             lit(42L),
@@ -114,6 +121,10 @@ public class TestConstants {
                     lit("99999999999999999999999999999.999999999").cast(BQ_NUMERIC),
                     lit(3.14).cast(BQ_NUMERIC),
                     lit("31415926535897932384626433832.795028841").cast(BQ_NUMERIC))),
+            struct(
+                    lit("-578960446186580977117854925043439539266.34992332820282019728792003956564819968"),
+                    lit("578960446186580977117854925043439539266.34992332820282019728792003956564819967")
+            ),
             array(seq(lit(1), lit(2), lit(3))),
             array(seq(struct(seq(lit(1)))))
     );

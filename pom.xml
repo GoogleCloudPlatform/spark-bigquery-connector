@@ -1,0 +1,130 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.google.cloud.spark</groupId>
+    <artifactId>spark-bigquery-parent</artifactId>
+    <version>0.30.0-SNAPSHOT</version>
+    <relativePath>spark-bigquery-parent</relativePath>
+  </parent>
+
+  <artifactId>spark-bigquery-reactor</artifactId>
+  <packaging>pom</packaging>
+  <name>Spark BigQuery Connector Reactor</name>
+  <version>spark24-0.30.0-SNAPSHOT</version>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <organization>Google Inc.</organization>
+      <organizationUrl>http://www.google.com</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>
+      scm:git:git@github.com:GoogleCloudDataproc/spark-bigquery-connector.git
+    </connection>
+    <developerConnection>
+      scm:git:git@github.com:GoogleCloudDataproc/spark-bigquery-connector.git
+    </developerConnection>
+    <url>git@github.com:GoogleCloudDataproc/spark-bigquery-connector.git</url>
+  </scm>
+
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>
+      https://github.com/GoogleCloudDataproc/spark-bigquery-connector/issues
+    </url>
+  </issueManagement>
+
+  <modules>
+    <module>spark-bigquery-parent</module>
+    <module>bigquery-connector-common</module>
+    <module>spark-bigquery-connector-common</module>
+    <module>spark-bigquery-python-lib</module>
+  </modules>
+
+  <profiles>
+    <profile>
+      <id>all</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>spark-bigquery-dsv1</module>
+        <module>spark-bigquery-dsv2</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>dsv1</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>spark-bigquery-dsv1</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>dsv1_2.11</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>spark-bigquery-dsv1/spark-bigquery-dsv1-parent</module>
+        <module>spark-bigquery-dsv1/spark-bigquery_2.11</module>
+        <module>spark-bigquery-dsv1/spark-bigquery-with-dependencies_2.11
+        </module>
+      </modules>
+    </profile>
+    <profile>
+      <id>dsv1_2.12</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>spark-bigquery-dsv1/spark-bigquery-dsv1-parent</module>
+        <module>spark-bigquery-dsv1/spark-bigquery_2.12</module>
+        <module>spark-bigquery-dsv1/spark-bigquery-with-dependencies_2.12
+        </module>
+      </modules>
+    </profile>
+    <profile>
+      <id>dsv2</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>spark-bigquery-dsv2</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>dsv2_2.4</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>spark-bigquery-dsv2/spark-bigquery-dsv2-parent</module>
+        <module>spark-bigquery-dsv2/spark-bigquery-spark24</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>dsv2_3</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <modules>
+        <module>spark-bigquery-dsv2/spark-bigquery-dsv2-parent</module>
+        <module>spark-bigquery-dsv2/spark-bigquery-spark3</module>
+      </modules>
+    </profile>
+  </profiles>
+</project>

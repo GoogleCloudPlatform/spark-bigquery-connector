@@ -1,7 +1,7 @@
 *.class
 *.log
 
-# sbt specific
+# sbt/maven specific
 .cache/
 .history/
 .lib/
@@ -11,11 +11,14 @@ lib_managed/
 src_managed/
 project/boot/
 project/plugins/project/
+dependency-reduced-pom.xml
+*.versionsBackup
 
 # Scala-IDE specific
 .scala_dependencies
 .worksheet
 .idea
+*.iml
 
 # Eclipse IDE Specific files
 .classpath

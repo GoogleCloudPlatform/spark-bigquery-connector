@@ -1,0 +1,54 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.google.cloud.spark</groupId>
+    <artifactId>spark-bigquery-dsv1-parent</artifactId>
+    <version>0.30.0-SNAPSHOT</version>
+    <relativePath>../spark-bigquery-dsv1-parent</relativePath>
+  </parent>
+
+  <artifactId>spark-bigquery_2.12</artifactId>
+  <name>BigQuery DataSource v1 for Scala 2.12</name>
+  <properties>
+    <scala.binary.version>2.12</scala.binary.version>
+    <scala.version>2.12.7</scala.version>
+    <spark.version>2.4.0</spark.version>
+  </properties>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <build>
+    <plugins>
+      <!-- make sure we don't have any _2.10 or _2.11 dependencies when building
+      for Scala 2.12 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.0.0-M3</version>
+        <executions>
+          <execution>
+            <id>enforce-versions</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <excludes combine.children="append">
+                    <exclude>*:*_2.11</exclude>
+                    <exclude>*:*_2.10</exclude>
+                  </excludes>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

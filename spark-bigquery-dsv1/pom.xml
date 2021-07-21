@@ -1,0 +1,24 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.google.cloud.spark</groupId>
+    <artifactId>spark-bigquery-parent</artifactId>
+    <version>0.30.0-SNAPSHOT</version>
+    <relativePath>../spark-bigquery-parent</relativePath>
+  </parent>
+
+  <artifactId>spark-bigquery-dsv1</artifactId>
+  <name>BigQuery DataSource v1 implementation</name>
+  <packaging>pom</packaging>
+  <modules>
+    <module>spark-bigquery-dsv1-parent</module>
+    <module>spark-bigquery-dsv1-spark3-support</module>
+    <module>spark-bigquery_2.11</module>
+    <module>spark-bigquery_2.12</module>
+    <module>spark-bigquery-with-dependencies-parent</module>
+    <module>spark-bigquery-with-dependencies_2.11</module>
+    <module>spark-bigquery-with-dependencies_2.12</module>
+  </modules>
+</project>
